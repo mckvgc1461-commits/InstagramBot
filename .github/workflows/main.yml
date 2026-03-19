@@ -1,24 +1,19 @@
-name: Instagram Bot Tetikleyici
+name: Instagram Bot
+
 on:
-  push:
-    paths:
-      - 'Gelen_Kutusu/**' # Müşteri buraya foto atınca çalışır
-  workflow_dispatch: # Elinle başlatma butonu ekler
+  workflow_dispatch:
 
 jobs:
-  paylasim-yap:
+  run-bot:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Python Kur
+      - name: Kodu Cek
+        uses: actions/checkout@v3
+
+      - name: Python Hazirla
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-      - name: Kütüphaneleri Yükle
-        run: |
-          pip install playwright
-          playwright install chromium
-      - name: Botu Çalıştır
-        env:
-          IG_COOKIES: ${{ secrets.IG_COOKIES }}
+
+      - name: Botu Calistir
         run: python bot.py
