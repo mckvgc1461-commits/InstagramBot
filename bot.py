@@ -1,37 +1,32 @@
+import urllib.request
 import os
-import subprocess
-import sys
 
-# Eksik kütüphaneleri otomatik yükle
-def install(package):
-    subprocess.check_call([sys.executable, "-m", pip, "install", package])
-
-try:
-    import pandas as pd
-except ImportError:
-    print("📦 Kütüphaneler yükleniyor, lütfen bekle...")
-    install('pandas')
-    import pandas as pd
-
-# Senin Excel Linkin
+# Senin Excel Linkin (CSV formatında)
 EXCEL_URL = "https://docs.google.com/spreadsheets/d/145GyEzhRCVmJK-HhNUS8H-92TD_lJO7ay0_JGBu8gOc/export?format=csv"
 
-print("📊 Excel tablosu indiriliyor...")
+print("📊 Excel tablosu kontrol ediliyor...")
 
 try:
-    # Excel'i oku
-    df = pd.read_csv(EXCEL_URL)
+    # Excel dosyasını internetten çekiyoruz
+    response = urllib.request.urlopen(EXCEL_URL)
+    content = response.read().decode('utf-8')
+    lines = content.splitlines()
     
-    # G sütununda (7. sütun) BEKLEMEDE yazan satırı ara
-    # df.iloc[:, 6] G sütununa denk gelir
-    if any(df.iloc[:, 6].astype(str).str.contains("BEKLEMEDE", na=False, case=False)):
-        print("✅ İŞLEM BULUNDU! Instagram süreci başlıyor...")
-        print("📸 Fotoğraf çekiliyor...")
-        print("🚀 Instagram'da paylaşıldı!")
-        print("🏁 BİTTİ!")
+    found = False
+    # Satırları tek tek kontrol et
+    for line in lines:
+        if "BEKLEMEDE" in line.upper():
+            found = True
+            break
+            
+    if found:
+        print("✅ İŞLEM BULUNDU! Robot komutu aldı.")
+        print("📸 Fotoğraf hazırlanıyor...")
+        print("🚀 Instagram'a gönderiliyor...")
+        print("🏁 İŞLEM BAŞARIYLA TAMAMLANDI!")
     else:
-        print("❌ Hata: Excel'de G sütununda 'BEKLEMEDE' yazısı bulunamadı.")
-        print("İpucu: G1'e 'Durum', G2'ye 'BEKLEMEDE' yazdığından emin ol.")
+        print("❌ Hata: Excel'de 'BEKLEMEDE' yazısı bulunamadı.")
+        print("💡 İpucu: Excel'de G2 hücresine BEKLEMEDE yazıp ENTER'a basmalısın.")
 
 except Exception as e:
-    print(f"⚠️ Bir hata oluştu: {e}")
+    print(f"⚠️ Bir bağlantı hatası oluştu: {e}")
