@@ -1,3 +1,10 @@
+# Senin özel Excel indirme linkin bu:
+EXCEL_URL = "https://docs.google.com/spreadsheets/d/145GyEzhRCVmJK-HhNUS8H-92TD_lJO7ay0_JGBu8gOc/export?format=csv"
+
+
+
+
+
 import os
 import json
 import gspread
