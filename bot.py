@@ -1,58 +1,58 @@
-import sqlite3
-import time
 import os
+import json
+import gspread
+import requests
+from oauth2client.service_account import ServiceAccountCredentials
 from playwright.sync_api import sync_playwright
 
-# AYARLAR (Burayı Instagram değiştikçe güncelleyeceğiz, kodla uğraşmayacaksın!)
-BUTON_YENI_GÖNDERİ = 'svg[aria-label="Yeni Gönderi"]'
-BUTON_BILGISAYARDAN_SEC = 'button:has-text("Bilgisayardan seç")'
+def sistemi_baslat():
+    # 1. Google Sheets Bağlantısı (Excel'i açar)
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds_json = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_json, scope)
+    client = gspread.authorize(creds)
+    
+    # Formun bağlı olduğu tablonun adını buraya yaz
+    sheet = client.open("Instagram Paylaşım Paneli (Yanıtlar)").sheet1
+    veriler = sheet.get_all_records()
 
-def motoru_calistir():
-    while True:
-        try:
-            # 1. Veritabanına Bak: Sırası gelmiş post var mı?
-            conn = sqlite3.connect('../veritabani.db')
-            cursor = conn.cursor()
-            # Durumu 0 (Bekliyor) olan en eski postu al
-            cursor.execute("SELECT * FROM Paylasimlar WHERE Durum=0 ORDER BY Id ASC LIMIT 1")
-            post = cursor.fetchone()
-
-            if post:
-                p_id, user, pw, img, caption = post[0], post[1], post[2], post[3], post[4]
-                print(f"🚀 {user} için paylaşım başlıyor...")
-
-                with sync_playwright() as p:
-                    # GİZLİ TARAYICIYI AÇ (Seni gerçek telefon sanacak)
-                    browser = p.chromium.launch(headless=False) # İlk testlerde True yapma, izle!
-                    context = browser.new_context(viewport={'width': 400, 'height': 800}, is_mobile=True)
-                    page = context.new_page()
-
-                    # INSTAGRAM'A GİRİŞ
-                    page.goto("https://www.instagram.com/accounts/login/")
-                    page.fill('input[name="username"]', user)
-                    page.fill('input[name="password"]', pw)
-                    page.click('button[type="submit"]')
-                    page.wait_for_timeout(5000)
-
-                    # PAYLAŞIM ADIMLARI
-                    if page.query_selector(BUTON_YENI_GÖNDERİ):
-                        page.click(BUTON_YENI_GÖNDERİ)
-                        # Buraya resim yükleme ve açıklama yazma kodlarını ekleyeceğiz...
-                        print("✅ Paylaşım yapıldı!")
-                        cursor.execute("UPDATE Paylasimlar SET Durum=1 WHERE Id=?", (p_id,))
-                    else:
-                        print("❌ Instagram arayüzü değişmiş veya giriş başarısız!")
-                        cursor.execute("UPDATE Paylasimlar SET Durum=2 WHERE Id=?", (p_id,))
-                    
-                    conn.commit()
-                    browser.close()
+    for i, satir in enumerate(veriler, start=2):
+        # Sadece "BEKLEMEDE" olanları paylaş
+        if satir.get('Durum') == "BEKLEMEDE":
+            musteri_user = satir['Instagram Kullanıcı Adı']
+            musteri_cerez = satir['Çerez Kodu (Cookie)']
+            foto_url = satir['Fotoğrafı Buraya Yükle']
+            aciklama = satir['Paylaşım Açıklaması']
             
-            conn.close()
-        except Exception as e:
-            print(f"⚠️ Hata oluştu: {e}")
-        
-        print("😴 1 dakika bekleniyor...")
-        time.sleep(60)
+            print(f"👤 Şu an {musteri_user} hesabı için işlem yapılıyor...")
+
+            # 2. Müşterinin Çerezini Geçici Dosyaya Yaz
+            with open("current_session.json", "w") as f:
+                f.write(musteri_cerez)
+
+            # 3. Instagram Paylaşım Motoru (Playwright)
+            try:
+                with sync_playwright() as p:
+                    browser = p.chromium.launch(headless=True)
+                    # Müşterinin oturumuyla tarayıcıyı açar
+                    context = browser.new_context(storage_state="current_session.json")
+                    page = context.new_page()
+                    
+                    page.goto("https://www.instagram.com/")
+                    print(f"✅ {musteri_user} olarak giriş yapıldı.")
+
+                    # --- FOTOĞRAFI YÜKLEME ADIMLARI BURAYA GELECEK ---
+                    # (Butonlara tıklama, fotoğrafı seçme vs.)
+                    
+                    browser.close()
+
+                # 4. Excel'i Güncelle (Durumu OK yap)
+                sheet.update_cell(i, 6, "OK") # 6. sütun 'Durum' sütunu olmalı
+                print(f"✨ {musteri_user} paylaşımı başarıyla tamamlandı!")
+
+            except Exception as e:
+                print(f"❌ {musteri_user} paylaşımında hata: {e}")
+                sheet.update_cell(i, 6, "HATA")
 
 if __name__ == "__main__":
-    motoru_calistir()
+    sistemi_baslat()
